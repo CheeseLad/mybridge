@@ -45,7 +45,7 @@ export default function BiddingSystem() {
         setBiddingMessage("You pass.");
         setPassCount((prevPassCount) => prevPassCount + 1);
         nextPlayer();
-      }, Math.floor(Math.random() * 3000) + 2000);
+      }, Math.floor(Math.random() * 3000) + 1000);
     }
   };
 
@@ -57,7 +57,7 @@ export default function BiddingSystem() {
         setBiddingMessage(`${players[currentPlayerIndex]} passes`);
         setPassCount((prevPassCount) => prevPassCount + 1);
         nextPlayer();
-      }, Math.floor(Math.random() * 3000) + 2000);
+      }, Math.floor(Math.random() * 3000) + 1000);
 
       return;
     }
@@ -87,7 +87,7 @@ export default function BiddingSystem() {
       }
 
       nextPlayer();
-    }, Math.floor(Math.random() * 3000) + 2000);
+    }, Math.floor(Math.random() * 3000) + 1000);
   };
 
   const nextPlayer = () => {
