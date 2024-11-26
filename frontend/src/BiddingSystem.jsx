@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
-export default function BiddingSystem() {
-  const [players] = useState(["Alex", "Marie", "John", "Lisa"]);
+export default function BiddingSystem({ playerName }) {
+
+  const { state } = useLocation(); // Access passed player data through the state prop
+  const { playerName: passedPlayerName } = state || {}; // Destructure the playerName
+  const [players, setPlayers] = useState([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [highestBid, setHighestBid] = useState({ suit: "None", trick: 0 });
   const [selectedSuit, setSelectedSuit] = useState(null);
@@ -18,6 +21,20 @@ export default function BiddingSystem() {
 
   const suits = ["♣", "♦", "♥", "♠", "NT"];
   const tricks = [1, 2, 3, 4, 5, 6, 7];
+
+  // Fetch players from backend
+  useEffect(() => {
+    async function fetchPlayers() {
+      try {
+        const response = await fetch("/api/players"); // Replace with your actual API endpoint
+        const data = await response.json();
+        setPlayers(data);
+      } catch (error) {
+        console.error("Error fetching players:", error);
+      }
+    }
+    fetchPlayers();
+  }, []);
 
   const getSuitValue = (suit) => suits.indexOf(suit);
 
@@ -36,28 +53,25 @@ export default function BiddingSystem() {
         setBiddingMessage("Bid placed successfully!");
         setUserHasWon(true);
       } else {
-        setBiddingMessage(
-          "Your bid must be higher than the current highest bid."
-        );
+        setBiddingMessage("Your bid must be higher than the current highest bid.");
       }
       setHasBid(true);
       setTimeout(() => {
-        setBiddingMessage("You pass.");
+        setBiddingMessage(`${playerName} passes.`);
         setPassCount((prevPassCount) => prevPassCount + 1);
         nextPlayer();
-      }, Math.floor(Math.random() * 3000) + 1000);
+      }, 1500); // Adjusted timeout to remove randomness
     }
   };
 
   const simulateAIBid = () => {
     if (userHasWon) {
       setBiddingMessage(`${players[currentPlayerIndex]} passes...`);
-
       setTimeout(() => {
         setBiddingMessage(`${players[currentPlayerIndex]} passes`);
         setPassCount((prevPassCount) => prevPassCount + 1);
         nextPlayer();
-      }, Math.floor(Math.random() * 3000) + 1000);
+      }, 1500); // Adjusted timeout
 
       return;
     }
@@ -66,19 +80,14 @@ export default function BiddingSystem() {
 
     setTimeout(() => {
       let bidPlaced = false;
-      for (let attempts = 0; attempts < 5; attempts++) {
-        const randomSuit = suits[Math.floor(Math.random() * suits.length)];
-        const randomTrick =
-          Math.floor(Math.random() * (7 - highestBid.trick + 1)) +
-          highestBid.trick;
+      // Simulate AI bid logic (you can replace this with real logic)
+      const aiBidSuit = suits[1]; // Replace with your AI logic
+      const aiBidTrick = highestBid.trick + 1; // Increment trick for AI
 
-        if (isHigherBid(randomTrick, randomSuit)) {
-          setHighestBid({ suit: randomSuit, trick: randomTrick });
-
-          bidPlaced = true;
-          setPassCount(0);
-          break;
-        }
+      if (isHigherBid(aiBidTrick, aiBidSuit)) {
+        setHighestBid({ suit: aiBidSuit, trick: aiBidTrick });
+        bidPlaced = true;
+        setPassCount(0);
       }
 
       if (!bidPlaced) {
@@ -87,7 +96,7 @@ export default function BiddingSystem() {
       }
 
       nextPlayer();
-    }, Math.floor(Math.random() * 3000) + 1000);
+    }, 1500); // Adjusted timeout
   };
 
   const nextPlayer = () => {
@@ -147,6 +156,9 @@ export default function BiddingSystem() {
     setPassCount(0);
     setBiddingMessage("Starting Bidding...");
   };
+
+  // Use playerName from the prop or from the state
+  const activePlayer = playerName || passedPlayerName;
 
   return (
     <div className="flex items-center justify-center h-screen bg-green-900">
