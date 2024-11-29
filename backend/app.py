@@ -1,16 +1,21 @@
 from flask import Flask, jsonify, request
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
+import random
+import string
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "your_secret_key"
+app.config["SECRET_KEY"] = "344d47cb-0e03-4127-b08e-e392ac5d9dd8"
 
 CORS(app)
 
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+def generate_lobby_code(length=4):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
 lobby = {
-    "code": "ABCD",
+    "code": generate_lobby_code(),
     "players": [],
     "bids": {
         "highest_bid": {"suit": None, "trick": 0},
@@ -20,6 +25,7 @@ lobby = {
     "passed_players": []
 }
 
+print(f"Lobby Code: {lobby['code']}")
 
 @app.route("/lobby", methods=["GET"])
 def get_lobby():
