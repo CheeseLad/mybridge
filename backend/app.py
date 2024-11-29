@@ -1,14 +1,20 @@
 from flask import Flask, jsonify, request
 from flask_socketio import SocketIO, emit, join_room
+from flask_cors import CORS
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your_secret_key"
+
+# Enable CORS for all routes
+CORS(app)
+
+# Configure SocketIO with CORS
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global lobby state
 lobby = {
     "code": "ABCD",  # Static lobby code for simplicity
-    "players": [],    # List to track player names
+    "players": ["a", "b", "c"],    # List to track player names
     "bids": {         # Track the highest bid and its owner
         "highest_bid": {"suit": None, "trick": 0},
         "player": None

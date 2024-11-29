@@ -26,9 +26,10 @@ export default function BiddingSystem({ playerName }) {
   useEffect(() => {
     async function fetchPlayers() {
       try {
-        const response = await fetch("/api/players"); // Replace with your actual API endpoint
+        const response = await fetch("http://localhost:5000/lobby"); // Replace with your actual API endpoint
         const data = await response.json();
-        setPlayers(data);
+        setPlayers(data.lobby.players);
+        console.log("Players fetched:", data.lobby.players);
       } catch (error) {
         console.error("Error fetching players:", error);
       }
@@ -165,7 +166,7 @@ export default function BiddingSystem({ playerName }) {
       <div className="flex flex-row bg-green-800 rounded-lg p-4 shadow-lg">
         <div className="bg-green-600 rounded-lg relative p-24">
           <h1 className="absolute top-2 left-4 text-2xl font-bold text-white">
-            MyBridge
+            MyBridge: {playerName}
           </h1>
           {players.map((player, index) => (
             <div
