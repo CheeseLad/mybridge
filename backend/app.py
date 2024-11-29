@@ -14,15 +14,15 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # Global lobby state
 lobby = {
     "code": "ABCD",  # Static lobby code for simplicity
-    "players": ["a", "b", "c"],    # List to track player names
-    "bids": {         # Track the highest bid and its owner
+    "players": [],   # List to track player names
+    "bids": {        # Track the highest bid and its owner
         "highest_bid": {"suit": None, "trick": 0},
         "player": None
     },
-    "current_turn": 0  # Index of the player whose turn it is
+    "current_turn": 0,  # Index of the player whose turn it is
+    "passed_players": []  # Track players who passed
 }
 
-# Endpoint to fetch the current lobby state
 @app.route("/lobby", methods=["GET"])
 def get_lobby():
     return jsonify({"lobby": lobby})
@@ -62,7 +62,7 @@ def handle_join_lobby(data):
 @socketio.on("place_bid")
 def handle_place_bid(data):
     player = data.get("player")
-    bid = data.get("bid")  # Expecting {"suit": "♠", "trick": 5}
+    bid = data.get("bid")
 
     if not player or not bid or "suit" not in bid or "trick" not in bid:
         emit("bid_error", {"error": "Invalid bid data."})
@@ -74,7 +74,6 @@ def handle_place_bid(data):
 
     current_highest = lobby["bids"]["highest_bid"]
 
-    # Validate the bid is higher than the current highest
     def is_higher_bid(new_bid, current_bid):
         suits_order = ["♣", "♦", "♥", "♠", "NT"]
         new_suit_value = suits_order.index(new_bid["suit"])
@@ -89,29 +88,47 @@ def handle_place_bid(data):
         # Update the highest bid
         lobby["bids"]["highest_bid"] = bid
         lobby["bids"]["player"] = player
-
-        # Notify all players about the new highest bid
         emit("new_highest_bid", {"highest_bid": bid, "player": player}, to=lobby["code"])
     else:
         emit("bid_error", {"error": "Your bid must be higher than the current highest bid."})
         return
 
-    # Move to the next player's turn
+    next_turn()
+
+@socketio.on("pass")
+def handle_pass(data):
+    player = data.get("player")
+
+    if player != lobby["players"][lobby["current_turn"]]:
+        emit("pass_error", {"error": "It's not your turn."})
+        return
+
+    if player not in lobby["passed_players"]:
+        lobby["passed_players"].append(player)
+
     next_turn()
 
 def next_turn():
-    lobby["current_turn"] = (lobby["current_turn"] + 1) % len(lobby["players"])
-
-    # Check if all players except one have passed
-    if all(player == lobby["bids"]["player"] for player in lobby["players"] if player != None):
-        # End bidding round
+    active_players = [
+        player for player in lobby["players"] if player not in lobby["passed_players"]
+    ]
+    if len(active_players) == 1:
         emit("bidding_ended", {
             "highest_bid": lobby["bids"]["highest_bid"],
             "player": lobby["bids"]["player"]
         }, to=lobby["code"])
-    else:
-        # Notify the next player
-        emit("next_turn", {"player": lobby["players"][lobby["current_turn"]]}, to=lobby["code"])
+        return
+
+    while True:
+        lobby["current_turn"] = (lobby["current_turn"] + 1) % len(lobby["players"])
+        next_player = lobby["players"][lobby["current_turn"]]
+        if next_player not in lobby["passed_players"]:
+            break
+
+    emit("next_turn", {"player": lobby["players"][lobby["current_turn"]]}, to=lobby["code"])
+    
+def update_player_index():
+    lobby["current_turn"] = lobby["current_turn"] + 1
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)

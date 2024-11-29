@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { io } from "socket.io-client";
 
 export default function BiddingSystem({ playerName }) {
   const [players, setPlayers] = useState([]);
-  const [lobby, setLobby] = useState(null);
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(1);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [highestBid, setHighestBid] = useState({ suit: "None", trick: 0 });
   const [selectedSuit, setSelectedSuit] = useState(null);
   const [selectedTrick, setSelectedTrick] = useState(null);
@@ -12,10 +12,9 @@ export default function BiddingSystem({ playerName }) {
   const [biddingMessage, setBiddingMessage] = useState("Starting Bidding...");
   const [passCount, setPassCount] = useState(0);
   const [showWinPopup, setShowWinPopup] = useState(false);
-  const [countdown, setCountdown] = useState(3);
   const [userHasWon, setUserHasWon] = useState(false);
   const [hasBid, setHasBid] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // State to manage loading state
+  const [socket, setSocket] = useState(null);
 
   const navigate = useNavigate();
 
@@ -35,26 +34,29 @@ export default function BiddingSystem({ playerName }) {
   const handleUserBid = () => {
     if (selectedSuit && selectedTrick) {
       if (isHigherBid(selectedTrick, selectedSuit)) {
-        setHighestBid({ suit: selectedSuit, trick: selectedTrick });
+        socket.emit("place_bid", {
+          player: playerName,
+          bid: { suit: selectedSuit, trick: selectedTrick }
+        });
         setBiddingMessage("Bid placed successfully!");
-        setUserHasWon(true);
-      } else {
-        setBiddingMessage(
-          "Your bid must be higher than the current highest bid."
-        );
-      }
-      setHasBid(true);
-      setTimeout(() => {
-        setBiddingMessage("You pass.");
-        setPassCount((prevPassCount) => prevPassCount + 1);
         nextPlayer();
-      }, Math.floor(Math.random() * 60000) + 1000);
+        setHasBid(true);
+      } else {
+        setBiddingMessage("Your bid must be higher than the current highest bid.");
+      }
     }
+  };
+
+  const handlePass = () => {
+    socket.emit("pass", { player: playerName });
+    setBiddingMessage("You passed.");
+    setPassCount((prevPassCount) => prevPassCount + 1);
   };
 
   const nextPlayer = () => {
     const nextIndex = (currentPlayerIndex + 1) % players.length;
     setCurrentPlayerIndex(nextIndex);
+    socket.emit("update_player_index");
     setSelectedSuit(null);
     setSelectedTrick(null);
     setHasBid(false);
@@ -80,26 +82,13 @@ export default function BiddingSystem({ playerName }) {
   };
 
   useEffect(() => {
-    console.log("Current player index:", currentPlayerIndex, players);
-    console.log("Player name:", "Jake");
-    console.log("Current player index:", players[currentPlayerIndex]);
-    if ("Jake" === players[currentPlayerIndex]) {
-      setIsUserTurn(true);
-      setBiddingMessage("It's your turn to bid!");
-    } else {
-      setIsUserTurn(false);
-      setBiddingMessage(players[currentPlayerIndex] + " is bidding...");
-    }
-  }, [currentPlayerIndex, players, playerName]);
-
-  useEffect(() => {
-    const fetchPlayers = async () => {
+    // Polling function to fetch the latest player data every second
+    const fetchPlayersData = async () => {
       try {
         const response = await fetch("http://localhost:5000/lobby");
         if (response.ok) {
           const data = await response.json();
-          setPlayers(data.lobby.players); // Set players from the response
-          setIsLoading(false); // Once data is fetched, set loading to false
+          setPlayers(data.lobby.players);
         } else {
           console.error("Failed to fetch players data.");
         }
@@ -108,8 +97,59 @@ export default function BiddingSystem({ playerName }) {
       }
     };
 
-    fetchPlayers(); // Call the fetch function when the component mounts
-  }, []); // Empty dependency array ensures it runs only once on mount
+    // Start the polling every 1000ms (1 second)
+    const intervalId = setInterval(fetchPlayersData, 1000);
+
+    // Cleanup the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const socket = io("http://localhost:5000");
+    setSocket(socket);
+
+    socket.on("new_highest_bid", (data) => {
+      setHighestBid(data.highest_bid);
+      setBiddingMessage(`${data.player} placed a new highest bid.`);
+    });
+
+    socket.on("bid_error", (data) => {
+      setBiddingMessage(data.error);
+    });
+
+    socket.on("pass_error", (data) => {
+      setBiddingMessage(data.error);
+    });
+
+    socket.on("next_turn", (data) => {
+      if (data.player === playerName) {
+        setIsUserTurn(true);
+        setBiddingMessage("It's your turn to bid!");
+      } else {
+        setIsUserTurn(false);
+        setBiddingMessage(`${data.player} is bidding...`);
+      }
+    });
+
+    socket.on("bidding_ended", (data) => {
+      setBiddingMessage("Bidding has ended.");
+      setShowWinPopup(true);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [playerName]);
+
+  useEffect(() => {
+    if (playerName === players[currentPlayerIndex]) {
+      setIsUserTurn(true);
+      setBiddingMessage("It's your turn to bid!");
+    } else {
+      setIsUserTurn(false);
+      setBiddingMessage(players[currentPlayerIndex] + " is bidding...");
+    }
+  }, [currentPlayerIndex, players, playerName]);
 
   const resetGame = () => {
     setShowWinPopup(false);
@@ -119,6 +159,7 @@ export default function BiddingSystem({ playerName }) {
     setPassCount(0);
     setBiddingMessage("Starting Bidding...");
   };
+
 
   return (
     
@@ -231,7 +272,7 @@ export default function BiddingSystem({ playerName }) {
               {userHasWon ? "You won the bidding!" : "The bidding has ended!"}
             </p>
             <p className="text-lg text-gray-700">
-              Starting the game in {countdown} seconds...
+              Starting the game...
             </p>
           </div>
         </div>
