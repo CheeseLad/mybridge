@@ -36,21 +36,17 @@ export default function BiddingSystem({ playerName }) {
       if (isHigherBid(selectedTrick, selectedSuit)) {
         socket.emit("place_bid", {
           player: playerName,
-          bid: { suit: selectedSuit, trick: selectedTrick }
+          bid: { suit: selectedSuit, trick: selectedTrick },
         });
         setBiddingMessage("Bid placed successfully!");
         nextPlayer();
         setHasBid(true);
       } else {
-        setBiddingMessage("Your bid must be higher than the current highest bid.");
+        setBiddingMessage(
+          "Your bid must be higher than the current highest bid."
+        );
       }
     }
-  };
-
-  const handlePass = () => {
-    socket.emit("pass", { player: playerName });
-    setBiddingMessage("You passed.");
-    setPassCount((prevPassCount) => prevPassCount + 1);
   };
 
   const nextPlayer = () => {
@@ -64,26 +60,14 @@ export default function BiddingSystem({ playerName }) {
     if (passCount >= players.length) {
       setBiddingMessage("Bidding has ended.");
       setShowWinPopup(true);
+      setUserHasWon(true);
+      navigate("/game");
       return;
-    }
-
-    if (nextIndex === 2 && userHasWon) {
-      setBiddingMessage("You won the round!");
-      setShowWinPopup(true);
-      return;
-    }
-
-    if (nextIndex === 2) {
-      setIsUserTurn(true);
-      setBiddingMessage("It's your turn to bid!");
-    } else {
-      setIsUserTurn(false);
     }
   };
 
   useEffect(() => {
-    // Polling function to fetch the latest player data every second
-    const fetchPlayersData = async () => {
+    const fetchPlayers = async () => {
       try {
         const response = await fetch("http://localhost:5000/lobby");
         if (response.ok) {
@@ -97,11 +81,7 @@ export default function BiddingSystem({ playerName }) {
       }
     };
 
-    // Start the polling every 1000ms (1 second)
-    const intervalId = setInterval(fetchPlayersData, 1000);
-
-    // Cleanup the interval when the component unmounts
-    return () => clearInterval(intervalId);
+    fetchPlayers();
   }, []);
 
   useEffect(() => {
@@ -151,18 +131,7 @@ export default function BiddingSystem({ playerName }) {
     }
   }, [currentPlayerIndex, players, playerName]);
 
-  const resetGame = () => {
-    setShowWinPopup(false);
-    navigate("/game");
-    setHighestBid({ suit: "♣", trick: 1 });
-    setCurrentPlayerIndex(0);
-    setPassCount(0);
-    setBiddingMessage("Starting Bidding...");
-  };
-
-
   return (
-    
     <div className="flex items-center justify-center h-screen bg-green-900">
       <div className="flex flex-row bg-green-800 rounded-lg p-4 shadow-lg">
         <div className="bg-green-600 rounded-lg relative p-24">
@@ -170,25 +139,33 @@ export default function BiddingSystem({ playerName }) {
             MyBridge
           </h1>
           {players.map((player, index) => (
-  <div
-    key={player}
-    style={{
-      position: "absolute",
-      ...(index === 0 ? { top: "4%", left: "50%", transform: "translateX(-50%)" } : {}),
-      ...(index === 1 ? { left: "2%", top: "50%", transform: "translateY(-50%)" } : {}),
-      ...(index === 2 ? { bottom: "4%", left: "50%", transform: "translateX(-50%)" } : {}),
-      ...(index === 3 ? { right: "2%", top: "50%", transform: "translateY(-50%)" } : {}),
-    }}
-  >
-    <div
-      className={`px-4 py-1 rounded-full ${
-        currentPlayerIndex === index ? "bg-yellow-400" : "bg-blue-400"
-      } text-white`}
-    >
-      {player}
-    </div>
-  </div>
-))}
+            <div
+              key={player}
+              style={{
+                position: "absolute",
+                ...(index === 0
+                  ? { top: "4%", left: "50%", transform: "translateX(-50%)" }
+                  : {}),
+                ...(index === 1
+                  ? { left: "2%", top: "50%", transform: "translateY(-50%)" }
+                  : {}),
+                ...(index === 2
+                  ? { bottom: "4%", left: "50%", transform: "translateX(-50%)" }
+                  : {}),
+                ...(index === 3
+                  ? { right: "2%", top: "50%", transform: "translateY(-50%)" }
+                  : {}),
+              }}
+            >
+              <div
+                className={`px-4 py-1 rounded-full ${
+                  currentPlayerIndex === index ? "bg-yellow-400" : "bg-blue-400"
+                } text-white`}
+              >
+                {player}
+              </div>
+            </div>
+          ))}
 
           <div className="bg-green-700 p-6 rounded-lg flex flex-col items-center mt-8">
             <div className="text-white text-xl font-semibold mb-4">
@@ -271,9 +248,7 @@ export default function BiddingSystem({ playerName }) {
             <p className="text-lg font-semibold text-green-700 mb-4">
               {userHasWon ? "You won the bidding!" : "The bidding has ended!"}
             </p>
-            <p className="text-lg text-gray-700">
-              Starting the game...
-            </p>
+            <p className="text-lg text-gray-700">Starting the game...</p>
           </div>
         </div>
       )}

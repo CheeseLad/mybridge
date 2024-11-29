@@ -5,27 +5,26 @@ from flask_cors import CORS
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "your_secret_key"
 
-# Enable CORS for all routes
 CORS(app)
 
-# Configure SocketIO with CORS
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Global lobby state
 lobby = {
-    "code": "ABCD",  # Static lobby code for simplicity
-    "players": [],   # List to track player names
-    "bids": {        # Track the highest bid and its owner
+    "code": "ABCD",
+    "players": [],
+    "bids": {
         "highest_bid": {"suit": None, "trick": 0},
         "player": None
     },
-    "current_turn": 0,  # Index of the player whose turn it is
-    "passed_players": []  # Track players who passed
+    "current_turn": 0,
+    "passed_players": []
 }
+
 
 @app.route("/lobby", methods=["GET"])
 def get_lobby():
     return jsonify({"lobby": lobby})
+
 
 @socketio.on("join_lobby")
 def handle_join_lobby(data):
@@ -48,16 +47,15 @@ def handle_join_lobby(data):
         emit("join_error", {"error": "Name already taken."})
         return
 
-    # Add the player to the lobby
     lobby["players"].append(name)
-    join_room(lobby["code"])  # Join the room identified by the lobby code
+    join_room(lobby["code"])
 
-    # Notify all players in the lobby about the new player list
     emit("update_players", {"players": lobby["players"]}, to=lobby["code"])
 
-    # If the lobby is full, notify all players to start the game
     if len(lobby["players"]) == 4:
-        emit("start_game", {"message": "All players connected! Starting game..."}, to=lobby["code"])
+        emit("start_game", {
+             "message": "All players connected! Starting game..."}, to=lobby["code"])
+
 
 @socketio.on("place_bid")
 def handle_place_bid(data):
@@ -77,23 +75,27 @@ def handle_place_bid(data):
     def is_higher_bid(new_bid, current_bid):
         suits_order = ["♣", "♦", "♥", "♠", "NT"]
         new_suit_value = suits_order.index(new_bid["suit"])
-        current_suit_value = suits_order.index(current_bid["suit"]) if current_bid["suit"] else -1
+        current_suit_value = suits_order.index(
+            current_bid["suit"]) if current_bid["suit"] else -1
 
         return (
             new_bid["trick"] > current_bid["trick"] or
-            (new_bid["trick"] == current_bid["trick"] and new_suit_value > current_suit_value)
+            (new_bid["trick"] == current_bid["trick"]
+             and new_suit_value > current_suit_value)
         )
 
     if is_higher_bid(bid, current_highest):
-        # Update the highest bid
         lobby["bids"]["highest_bid"] = bid
         lobby["bids"]["player"] = player
-        emit("new_highest_bid", {"highest_bid": bid, "player": player}, to=lobby["code"])
+        emit("new_highest_bid", {"highest_bid": bid,
+             "player": player}, to=lobby["code"])
     else:
-        emit("bid_error", {"error": "Your bid must be higher than the current highest bid."})
+        emit("bid_error", {
+             "error": "Your bid must be higher than the current highest bid."})
         return
 
     next_turn()
+
 
 @socketio.on("pass")
 def handle_pass(data):
@@ -108,6 +110,7 @@ def handle_pass(data):
 
     next_turn()
 
+
 def next_turn():
     active_players = [
         player for player in lobby["players"] if player not in lobby["passed_players"]
@@ -120,15 +123,19 @@ def next_turn():
         return
 
     while True:
-        lobby["current_turn"] = (lobby["current_turn"] + 1) % len(lobby["players"])
+        lobby["current_turn"] = (
+            lobby["current_turn"] + 1) % len(lobby["players"])
         next_player = lobby["players"][lobby["current_turn"]]
         if next_player not in lobby["passed_players"]:
             break
 
-    emit("next_turn", {"player": lobby["players"][lobby["current_turn"]]}, to=lobby["code"])
-    
+    emit("next_turn", {"player": lobby["players"]
+         [lobby["current_turn"]]}, to=lobby["code"])
+
+
 def update_player_index():
     lobby["current_turn"] = lobby["current_turn"] + 1
+
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)

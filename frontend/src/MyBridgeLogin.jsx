@@ -12,20 +12,17 @@ export default function MyBridgeLogin() {
   const [lobbyCode, setLobbyCode] = useState("");
   const [players, setPlayers] = useState([]);
   const [inLobby, setInLobby] = useState(false);
-  const [playerName, setPlayerName] = useState(""); // State to store player name
+  const [playerName, setPlayerName] = useState("");
   const [playingGame, setPlayingGame] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen for player updates and start game event
     socket.on("update_players", (data) => {
       setPlayers(data.players);
     });
 
     socket.on("start_game", () => {
-      // On game start, navigate to the BiddingSystem with player data
       setPlayingGame(true);
-      
     });
 
     socket.on("join_error", (data) => {
@@ -41,13 +38,12 @@ export default function MyBridgeLogin() {
   }, [navigate, playerName]);
 
   const handleLogin = () => {
-    setError(""); // Reset error
+    setError("");
     setShowPopup(true);
 
-    // Emit the join_lobby event to the server
     socket.emit("join_lobby", { name, code: lobbyCode });
-    setPlayerName(name); // Save the player's name in state
-    setInLobby(true); // Transition to the waiting room
+    setPlayerName(name);
+    setInLobby(true);
   };
 
   return (
@@ -62,11 +58,15 @@ export default function MyBridgeLogin() {
             <h1 className="absolute top-4 left-4 text-3xl font-bold text-white">
               MyBridge
             </h1>
-  
+
             {!inLobby ? (
               <div>
                 <div className="flex justify-center mb-8 py-4">
-                  <img src="/cards.png" alt="Playing Cards" className="w-48 h-48" />
+                  <img
+                    src="/cards.png"
+                    alt="Playing Cards"
+                    className="w-48 h-48"
+                  />
                 </div>
                 <div className="bg-green-600 p-6 rounded-lg shadow-md mb-4">
                   <h2 className="text-white text-2xl font-bold text-center mb-4">
@@ -108,7 +108,7 @@ export default function MyBridgeLogin() {
                 <p className="text-sm">Players connected: {players.length}/4</p>
               </div>
             )}
-  
+
             {showPopup && (
               <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center">
                 <div className="bg-white p-6 rounded-lg shadow-lg text-center">
@@ -118,13 +118,13 @@ export default function MyBridgeLogin() {
                 </div>
               </div>
             )}
-  
+
             {error && (
               <div className="bg-red-500 text-white p-4 rounded-lg mt-4">
                 {error}
               </div>
             )}
-  
+
             <div className="absolute bottom-4 left-4 text-sm text-gray-300">
               2024 MyBridge Copyright
             </div>
@@ -136,4 +136,4 @@ export default function MyBridgeLogin() {
       )}
     </div>
   );
-}  
+}
