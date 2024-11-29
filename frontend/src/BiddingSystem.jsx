@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 export default function BiddingSystem({ playerName }) {
-
-  const { state } = useLocation(); // Access passed player data through the state prop
-  const { playerName: passedPlayerName } = state || {}; // Destructure the playerName
   const [players, setPlayers] = useState([]);
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const [lobby, setLobby] = useState(null);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(1);
   const [highestBid, setHighestBid] = useState({ suit: "None", trick: 0 });
   const [selectedSuit, setSelectedSuit] = useState(null);
   const [selectedTrick, setSelectedTrick] = useState(null);
@@ -17,25 +15,12 @@ export default function BiddingSystem({ playerName }) {
   const [countdown, setCountdown] = useState(3);
   const [userHasWon, setUserHasWon] = useState(false);
   const [hasBid, setHasBid] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // State to manage loading state
+
   const navigate = useNavigate();
 
   const suits = ["♣", "♦", "♥", "♠", "NT"];
   const tricks = [1, 2, 3, 4, 5, 6, 7];
-
-  // Fetch players from backend
-  useEffect(() => {
-    async function fetchPlayers() {
-      try {
-        const response = await fetch("http://localhost:5000/lobby"); // Replace with your actual API endpoint
-        const data = await response.json();
-        setPlayers(data.lobby.players);
-        console.log("Players fetched:", data.lobby.players);
-      } catch (error) {
-        console.error("Error fetching players:", error);
-      }
-    }
-    fetchPlayers();
-  }, []);
 
   const getSuitValue = (suit) => suits.indexOf(suit);
 
@@ -54,50 +39,17 @@ export default function BiddingSystem({ playerName }) {
         setBiddingMessage("Bid placed successfully!");
         setUserHasWon(true);
       } else {
-        setBiddingMessage("Your bid must be higher than the current highest bid.");
+        setBiddingMessage(
+          "Your bid must be higher than the current highest bid."
+        );
       }
       setHasBid(true);
       setTimeout(() => {
-        setBiddingMessage(`${playerName} passes.`);
+        setBiddingMessage("You pass.");
         setPassCount((prevPassCount) => prevPassCount + 1);
         nextPlayer();
-      }, 1500); // Adjusted timeout to remove randomness
+      }, Math.floor(Math.random() * 60000) + 1000);
     }
-  };
-
-  const simulateAIBid = () => {
-    if (userHasWon) {
-      setBiddingMessage(`${players[currentPlayerIndex]} passes...`);
-      setTimeout(() => {
-        setBiddingMessage(`${players[currentPlayerIndex]} passes`);
-        setPassCount((prevPassCount) => prevPassCount + 1);
-        nextPlayer();
-      }, 1500); // Adjusted timeout
-
-      return;
-    }
-
-    setBiddingMessage(`${players[currentPlayerIndex]} is choosing...`);
-
-    setTimeout(() => {
-      let bidPlaced = false;
-      // Simulate AI bid logic (you can replace this with real logic)
-      const aiBidSuit = suits[1]; // Replace with your AI logic
-      const aiBidTrick = highestBid.trick + 1; // Increment trick for AI
-
-      if (isHigherBid(aiBidTrick, aiBidSuit)) {
-        setHighestBid({ suit: aiBidSuit, trick: aiBidTrick });
-        bidPlaced = true;
-        setPassCount(0);
-      }
-
-      if (!bidPlaced) {
-        setBiddingMessage(`${players[currentPlayerIndex]} passes`);
-        setPassCount((prevPassCount) => prevPassCount + 1);
-      }
-
-      nextPlayer();
-    }, 1500); // Adjusted timeout
   };
 
   const nextPlayer = () => {
@@ -105,7 +57,6 @@ export default function BiddingSystem({ playerName }) {
     setCurrentPlayerIndex(nextIndex);
     setSelectedSuit(null);
     setSelectedTrick(null);
-
     setHasBid(false);
 
     if (passCount >= players.length) {
@@ -129,25 +80,36 @@ export default function BiddingSystem({ playerName }) {
   };
 
   useEffect(() => {
-    if (!isUserTurn && currentPlayerIndex !== 2) {
-      simulateAIBid();
+    console.log("Current player index:", currentPlayerIndex, players);
+    console.log("Player name:", "Jake");
+    console.log("Current player index:", players[currentPlayerIndex]);
+    if ("Jake" === players[currentPlayerIndex]) {
+      setIsUserTurn(true);
+      setBiddingMessage("It's your turn to bid!");
+    } else {
+      setIsUserTurn(false);
+      setBiddingMessage(players[currentPlayerIndex] + " is bidding...");
     }
-  }, [currentPlayerIndex]);
+  }, [currentPlayerIndex, players, playerName]);
 
   useEffect(() => {
-    if (showWinPopup) {
-      const countdownInterval = setInterval(() => {
-        setCountdown((prevCountdown) => {
-          if (prevCountdown === 1) {
-            clearInterval(countdownInterval);
-            resetGame();
-            return 3;
-          }
-          return prevCountdown - 1;
-        });
-      }, 1000);
-    }
-  }, [showWinPopup]);
+    const fetchPlayers = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/lobby");
+        if (response.ok) {
+          const data = await response.json();
+          setPlayers(data.lobby.players); // Set players from the response
+          setIsLoading(false); // Once data is fetched, set loading to false
+        } else {
+          console.error("Failed to fetch players data.");
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchPlayers(); // Call the fetch function when the component mounts
+  }, []); // Empty dependency array ensures it runs only once on mount
 
   const resetGame = () => {
     setShowWinPopup(false);
@@ -158,46 +120,34 @@ export default function BiddingSystem({ playerName }) {
     setBiddingMessage("Starting Bidding...");
   };
 
-  // Use playerName from the prop or from the state
-  const activePlayer = playerName || passedPlayerName;
-
   return (
+    
     <div className="flex items-center justify-center h-screen bg-green-900">
       <div className="flex flex-row bg-green-800 rounded-lg p-4 shadow-lg">
         <div className="bg-green-600 rounded-lg relative p-24">
           <h1 className="absolute top-2 left-4 text-2xl font-bold text-white">
-            MyBridge: {playerName}
+            MyBridge
           </h1>
           {players.map((player, index) => (
-            <div
-              key={player}
-              className={`absolute ${
-                player === "Alex"
-                  ? "top-4 left-1/2 transform -translate-x-1/2"
-                  : ""
-              } ${
-                player === "Lisa"
-                  ? "left-2 top-1/2 transform -translate-y-1/2"
-                  : ""
-              } ${
-                player === "John"
-                  ? "bottom-4 left-1/2 transform -translate-x-1/2"
-                  : ""
-              } ${
-                player === "Marie"
-                  ? "right-2 top-1/2 transform -translate-y-1/2"
-                  : ""
-              }`}
-            >
-              <div
-                className={`px-4 py-1 rounded-full ${
-                  currentPlayerIndex === index ? "bg-yellow-400" : "bg-blue-400"
-                } text-white`}
-              >
-                {player}
-              </div>
-            </div>
-          ))}
+  <div
+    key={player}
+    style={{
+      position: "absolute",
+      ...(index === 0 ? { top: "4%", left: "50%", transform: "translateX(-50%)" } : {}),
+      ...(index === 1 ? { left: "2%", top: "50%", transform: "translateY(-50%)" } : {}),
+      ...(index === 2 ? { bottom: "4%", left: "50%", transform: "translateX(-50%)" } : {}),
+      ...(index === 3 ? { right: "2%", top: "50%", transform: "translateY(-50%)" } : {}),
+    }}
+  >
+    <div
+      className={`px-4 py-1 rounded-full ${
+        currentPlayerIndex === index ? "bg-yellow-400" : "bg-blue-400"
+      } text-white`}
+    >
+      {player}
+    </div>
+  </div>
+))}
 
           <div className="bg-green-700 p-6 rounded-lg flex flex-col items-center mt-8">
             <div className="text-white text-xl font-semibold mb-4">
