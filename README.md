@@ -52,4 +52,4 @@ Before you begin, make sure you have the following installed on your device:
    flask run
    ```
 
-7 **Open your browser and navigate to `http://localhost:3000/` to start playing MyBridge.**
+7 **Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to start playing MyBridge.**
