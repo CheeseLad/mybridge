@@ -10,7 +10,7 @@ export default function BiddingSystem({ playerName }) {
   const [selectedTrick, setSelectedTrick] = useState(null);
   const [isUserTurn, setIsUserTurn] = useState(false);
   const [biddingMessage, setBiddingMessage] = useState("Starting Bidding...");
-  const [passCount, setPassCount] = useState(0);
+  const passCount = useState(0);
   const [showWinPopup, setShowWinPopup] = useState(false);
   const [userHasWon, setUserHasWon] = useState(false);
   const [hasBid, setHasBid] = useState(false);

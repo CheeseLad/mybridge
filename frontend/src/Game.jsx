@@ -2,11 +2,15 @@ import React, { useState, useEffect } from "react";
 
 export default function Game() {
   const [players, setPlayers] = useState([]);
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const playOrder = [2, 3, 0, 1];
+  const [startingOrderIndex, setStartingOrderIndex] = useState(0);
+  const [currentTurnIndex, setCurrentTurnIndex] = useState(0);
   const [roundWinner, setRoundWinner] = useState(null);
   const [teamScores, setTeamScores] = useState({ team1: 0, team2: 0 });
+  const [gameScores, setGameScores] = useState({ team1: 0, team2: 0 });
+  const [trumpSuit, setTrumpSuit] = useState("");
+  const [lastTrumpSuit, setLastTrumpSuit] = useState("");
 
-  // Initialize the game state once when the component mounts
   useEffect(() => {
     startNewGame();
   }, []);
@@ -14,15 +18,32 @@ export default function Game() {
   function startNewGame() {
     const deck = generateDeck();
     const shuffledDeck = shuffleDeck(deck);
+
+    const suits = ["♣️", "♦️", "♥️", "♠️"];
+
+    let availableSuits = suits;
+    if (lastTrumpSuit) {
+      availableSuits = suits.filter((suit) => suit !== lastTrumpSuit);
+    }
+
+    const chosenTrump =
+      availableSuits[Math.floor(Math.random() * availableSuits.length)];
+
+    setLastTrumpSuit(trumpSuit);
+    setTrumpSuit(chosenTrump);
+
     const initialPlayers = dealCards(shuffledDeck, [
       { name: "Alex", team: 1 },
       { name: "Lisa", team: 2 },
       { name: "John", team: 1 },
       { name: "Marie", team: 2 },
     ]);
+
     setPlayers(initialPlayers);
     setTeamScores({ team1: 0, team2: 0 });
-    setCurrentPlayerIndex(0);
+    setGameScores({ team1: 0, team2: 0 });
+    setStartingOrderIndex(0);
+    setCurrentTurnIndex(0);
   }
 
   function generateDeck() {
@@ -63,94 +84,122 @@ export default function Game() {
   }
 
   function playCard(cardIndex) {
-    // Clone the players array
     const newPlayers = [...players];
-
-    // Clone the player object to avoid mutating state directly
+    const totalPlayers = playOrder.length;
+    const currentPlayerIndex =
+      playOrder[(startingOrderIndex + currentTurnIndex) % totalPlayers];
     const player = { ...newPlayers[currentPlayerIndex] };
-
-    // Clone the player's hand
     const hand = [...player.hand];
 
-    // Remove the played card from the hand
     const playedCard = hand.splice(cardIndex, 1)[0];
-
-    // Update player's hand and playedCard
     player.hand = hand;
     player.playedCard = playedCard;
-
-    // Update the players array with the updated player
     newPlayers[currentPlayerIndex] = player;
-
-    // Update the state
     setPlayers(newPlayers);
 
-    // Advance to the next player
-    const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
-    setCurrentPlayerIndex(nextPlayerIndex);
+    setCurrentTurnIndex(currentTurnIndex + 1);
 
-    // Check if all players have played
     if (newPlayers.every((p) => p.playedCard !== null)) {
       determineRoundWinner();
     }
   }
 
   function determineRoundWinner() {
-    const suitRank = {
-      "♣️": 1,
-      "♦️": 2,
-      "♥️": 3,
-      "♠️": 4,
-    };
-
     const activePlayers = players.filter((p) => p.playedCard !== null);
 
-    // Find the highest suit rank among the played cards
-    const highestSuitRank = Math.max(
-      ...activePlayers.map((p) => suitRank[p.playedCard.suit])
+    const trumpCards = activePlayers.filter(
+      (p) => p.playedCard.suit === trumpSuit
     );
 
-    // Filter players who played the highest suit
-    const playersWithHighestSuit = activePlayers.filter(
-      (p) => suitRank[p.playedCard.suit] === highestSuitRank
-    );
+    let winner;
 
-    // Determine the winner among those players
-    let winner = playersWithHighestSuit.reduce((prev, curr) => {
-      return prev.playedCard.value > curr.playedCard.value ? prev : curr;
-    });
+    if (trumpCards.length > 0) {
+      winner = trumpCards.reduce((prev, curr) => {
+        return prev.playedCard.value > curr.playedCard.value ? prev : curr;
+      });
+    } else {
+      const suitRank = {
+        "♣️": 1,
+        "♦️": 2,
+        "♥️": 3,
+        "♠️": 4,
+      };
+
+      const highestSuitRank = Math.max(
+        ...activePlayers.map((p) => suitRank[p.playedCard.suit])
+      );
+
+      const playersWithHighestSuit = activePlayers.filter(
+        (p) => suitRank[p.playedCard.suit] === highestSuitRank
+      );
+
+      winner = playersWithHighestSuit.reduce((prev, curr) => {
+        return prev.playedCard.value > curr.playedCard.value ? prev : curr;
+      });
+    }
 
     setRoundWinner(winner.name);
 
-    // Update team scores
     const winningTeam = winner.team;
     const updatedTeamScores = { ...teamScores };
     updatedTeamScores[`team${winningTeam}`] += 20;
     setTeamScores(updatedTeamScores);
 
-    // Introduce a delay before resetting for the next round
     setTimeout(() => {
-      // Check for game over condition
       if (updatedTeamScores[`team${winningTeam}`] >= 100) {
-        // Reset game
-        alert(`Team ${winningTeam} wins the game!`);
-        startNewGame();
+        const updatedGameScores = { ...gameScores };
+        updatedGameScores[`team${winningTeam}`] += 1;
+        setGameScores(updatedGameScores);
+
+        setTeamScores({ team1: 0, team2: 0 });
+
+        if (updatedGameScores[`team${winningTeam}`] >= 2) {
+          alert(`Team ${winningTeam} wins the game!`);
+          setGameScores({ team1: 0, team2: 0 });
+          startNewGame();
+        } else {
+          alert(`Team ${winningTeam} wins this set! Starting a new set.`);
+          startNewSet();
+        }
       } else {
-        // Reset played cards for the next round
-        const newPlayers = players.map((player) => ({
-          ...player,
-          playedCard: null,
-        }));
-        setPlayers(newPlayers);
-
-        // Set current player to the winner
-        const winnerIndex = players.findIndex((p) => p.name === winner.name);
-        setCurrentPlayerIndex(winnerIndex);
-
-        // Clear the round winner after the delay
-        setRoundWinner(null);
+        resetRound();
       }
     }, 3000);
+  }
+
+  function startNewSet() {
+    const deck = generateDeck();
+    const shuffledDeck = shuffleDeck(deck);
+    const newPlayers = dealCards(shuffledDeck, players);
+    setPlayers(newPlayers);
+
+    const suits = ["♣️", "♦️", "♥️", "♠️"];
+    let availableSuits = suits;
+    if (lastTrumpSuit) {
+      availableSuits = suits.filter((suit) => suit !== lastTrumpSuit);
+    }
+
+    const chosenTrump =
+      availableSuits[Math.floor(Math.random() * availableSuits.length)];
+
+    setLastTrumpSuit(trumpSuit);
+    setTrumpSuit(chosenTrump);
+
+    setStartingOrderIndex((startingOrderIndex + 1) % playOrder.length);
+    setCurrentTurnIndex(0);
+    setRoundWinner(null);
+  }
+
+  function resetRound() {
+    const newPlayers = players.map((player) => ({
+      ...player,
+      playedCard: null,
+    }));
+    setPlayers(newPlayers);
+
+    setStartingOrderIndex((startingOrderIndex + 1) % playOrder.length);
+    setCurrentTurnIndex(0);
+    setRoundWinner(null);
   }
 
   function cardDisplay(card) {
@@ -166,15 +215,12 @@ export default function Game() {
 
   return (
     <div className="flex flex-col h-screen bg-green-900 text-white font-sans">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 bg-green-800">
         <h1 className="text-3xl font-bold">MyBridge</h1>
         <div className="text-3xl cursor-pointer">☰</div>
       </div>
 
-      {/* Main Content */}
       <div className="flex flex-1 relative">
-        {/* Winner Announcement */}
         {roundWinner && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
             <div className="bg-white text-black p-8 rounded-lg">
@@ -184,21 +230,24 @@ export default function Game() {
           </div>
         )}
 
-        {/* Game Board */}
         <div className="relative flex flex-col items-center justify-center flex-1 bg-green-700 border-4 border-yellow-500 rounded-lg p-4 mx-4">
-          {/* Players */}
           {players.map((player, index) => (
             <PlayerArea
               key={index}
               player={player}
               position={getPosition(index)}
-              isCurrent={currentPlayerIndex === index}
+              isCurrent={
+                index ===
+                playOrder[
+                  (startingOrderIndex + currentTurnIndex) % playOrder.length
+                ]
+              }
               onPlayCard={playCard}
-              isBottomPlayer={index === 0} // Assuming the bottom player is at index 0
+              isBottomPlayer={index === 0}
+              trumpSuit={trumpSuit}
             />
           ))}
 
-          {/* Center Cards */}
           <div className="bg-green-600 p-4 rounded-lg flex items-center justify-center">
             <div className="grid grid-cols-2 gap-4">
               {players.map((player, i) => (
@@ -206,45 +255,75 @@ export default function Game() {
                   key={i}
                   className="bg-white text-black w-10 h-14 rounded border border-gray-400 flex items-center justify-center"
                 >
-                  {player.playedCard ? `${cardDisplay(player.playedCard)}` : "🂠"}
+                  {player.playedCard
+                    ? `${cardDisplay(player.playedCard)}`
+                    : "🂠"}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Sidebar */}
         <div className="w-1/4 bg-gray-100 text-gray-900 rounded-lg shadow-lg p-4">
           <div className="bg-yellow-500 text-center text-xl font-bold py-2 rounded mb-4">
             {roundWinner ? `Winner: ${roundWinner}` : `Round in Progress`}
           </div>
-          {/* Team Scores */}
+
           <div className="mb-4">
             <h3 className="text-lg font-semibold">Team Scores:</h3>
             <p>Team 1: {teamScores.team1}</p>
             <p>Team 2: {teamScores.team2}</p>
           </div>
+
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold">Game Scores:</h3>
+            <p>Team 1: {gameScores.team1}</p>
+            <p>Team 2: {gameScores.team2}</p>
+          </div>
+
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold">Trump Suit:</h3>
+            <p>{trumpSuit || "No Trump Yet"}</p>
+          </div>
         </div>
       </div>
 
-      {/* Footer */}
       <div className="flex justify-between items-center p-2 bg-green-800 text-gray-300 text-sm">
         <span>© 2024 MyBridge Copyright</span>
-        <span className="cursor-pointer hover:text-white">Terms and Services</span>
+        <span className="cursor-pointer hover:text-white">
+          Terms and Services
+        </span>
       </div>
     </div>
   );
 }
 
-function PlayerArea({ player, position, isCurrent, onPlayCard, isBottomPlayer }) {
+function PlayerArea({
+  player,
+  position,
+  isCurrent,
+  onPlayCard,
+  isBottomPlayer,
+  trumpSuit,
+}) {
   const positionClasses = getPositionClasses(position);
 
   const handleCardClick = (i) => {
-    if (isCurrent) {
-      onPlayCard(i);
-    } else {
+    if (!isCurrent) {
       alert("It's not your turn!");
+      return;
     }
+
+    if (trumpSuit) {
+      const hasTrump = player.hand.some((card) => card.suit === trumpSuit);
+      const selectedCard = player.hand[i];
+      if (hasTrump && selectedCard.suit !== trumpSuit) {
+        alert(`You must play a card of the trump suit (${trumpSuit})`);
+        return;
+      }
+    }
+
+    onPlayCard(i);
   };
 
   return (
@@ -256,7 +335,11 @@ function PlayerArea({ player, position, isCurrent, onPlayCard, isBottomPlayer })
         {player.hand.map((card, i) => (
           <div
             key={`${card.suit}${card.value}${i}`}
-            className="bg-white text-black w-6 h-10 rounded border border-gray-400 cursor-pointer flex items-center justify-center text-sm"
+            className={`bg-white text-black w-6 h-10 rounded border border-gray-400 cursor-pointer flex items-center justify-center text-sm ${
+              trumpSuit && card.suit === trumpSuit
+                ? "border-yellow-500"
+                : ""
+            }`}
             onClick={() => handleCardClick(i)}
           >
             {isBottomPlayer ? `${cardDisplay(card)}` : ""}
@@ -268,16 +351,15 @@ function PlayerArea({ player, position, isCurrent, onPlayCard, isBottomPlayer })
 }
 
 function getPosition(index) {
-  // Map player index to positions around the table in clockwise order
   switch (index) {
     case 0:
-      return "bottom"; // Player 0 at the bottom
+      return "bottom";
     case 1:
-      return "left"; // Player 1 to the left
+      return "left";
     case 2:
-      return "top"; // Player 2 at the top
+      return "top";
     case 3:
-      return "right"; // Player 3 to the right
+      return "right";
     default:
       return "";
   }
